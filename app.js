@@ -608,89 +608,58 @@ function syncInventoryFromExtension() {
   if (!syncInventoryBtn) return;
 
   syncInventoryBtn.disabled = true;
-  setInventorySyncStatus('Fetching LatestMLBInventoryLoad.json from data/ folder...');
+  setInventorySyncStatus('Please select your downloaded raw JSON file...');
 
-  fetch('data/LatestMLBInventoryLoad.json?v=' + Date.now())
-    .then(res => {
-      if (!res.ok) {
-        throw new Error('LatestMLBInventoryLoad.json not found in data/ directory.');
+  let fileInput = document.getElementById('manual-inventory-file-input');
+  if (!fileInput) {
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'manual-inventory-file-input';
+    fileInput.accept = '.json';
+    fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) {
+        syncInventoryBtn.disabled = false;
+        updateInventorySyncStatusLabel();
+        return;
       }
-      return res.json();
-    })
-    .then(data => {
-      if (!data.cards) {
-        throw new Error('File is not in raw inventory JSON format.');
-      }
-      setInventorySyncStatus(`Found LatestMLBInventoryLoad.json. Parsing...`);
       
-      const fileDate = new Date(data.exportedAt || Date.now());
-      const timeStr = fileDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      }) + ' ' + fileDate.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      applyInventoryData(data, timeStr);
-      syncInventoryBtn.disabled = false;
-    })
-    .catch(error => {
-      console.warn('Auto-scan failed, opening manual file picker:', error);
-      setInventorySyncStatus('Local scan unavailable. Please select your downloaded raw JSON file...');
-      
-      let fileInput = document.getElementById('manual-inventory-file-input');
-      if (!fileInput) {
-        fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.id = 'manual-inventory-file-input';
-        fileInput.accept = '.json';
-        fileInput.style.display = 'none';
-        document.body.appendChild(fileInput);
-        
-        fileInput.addEventListener('change', (e) => {
-          const file = e.target.files[0];
-          if (!file) {
-            syncInventoryBtn.disabled = false;
-            updateInventorySyncStatusLabel();
-            return;
+      setInventorySyncStatus(`Reading ${file.name}...`);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const inventory = JSON.parse(event.target.result);
+          if (!inventory.cards) {
+            throw new Error('Selected file is not in raw inventory JSON format.');
           }
+          const fileDate = new Date(inventory.exportedAt || Date.now());
+          const timeStr = fileDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }) + ' ' + fileDate.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
           
-          setInventorySyncStatus(`Reading ${file.name}...`);
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            try {
-              const inventory = JSON.parse(event.target.result);
-              if (!inventory.cards) {
-                throw new Error('Selected file is not in raw inventory JSON format.');
-              }
-              const fileDate = new Date(inventory.exportedAt || Date.now());
-              const timeStr = fileDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              }) + ' ' + fileDate.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              
-              applyInventoryData(inventory, timeStr);
-            } catch (err) {
-              setInventorySyncStatus(`<span style="color: #ff5252;">Error: ${err.message}</span>`);
-            }
-            syncInventoryBtn.disabled = false;
-          };
-          reader.onerror = () => {
-            setInventorySyncStatus('<span style="color: #ff5252;">Error reading file</span>');
-            syncInventoryBtn.disabled = false;
-          };
-          reader.readAsText(file);
-        });
-      }
-      
-      fileInput.click();
+          applyInventoryData(inventory, timeStr);
+        } catch (err) {
+          setInventorySyncStatus(`<span style="color: #ff5252;">Error: ${err.message}</span>`);
+        }
+        syncInventoryBtn.disabled = false;
+      };
+      reader.onerror = () => {
+        setInventorySyncStatus('<span style="color: #ff5252;">Error reading file</span>');
+        syncInventoryBtn.disabled = false;
+      };
+      reader.readAsText(file);
     });
+  }
+  
+  fileInput.click();
 }
 
 
